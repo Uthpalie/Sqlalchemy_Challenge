@@ -46,26 +46,6 @@ session = Session(engine)
 
 from flask import Flask, jsonify
 
-prcp_12months = session.query(Measurement.date, Measurement.prcp).\
-    filter(Measurement.date < '2017-08-23', Measurement.date > '2016-08-22').\
-    order_by(Measurement.date).all()
-prcp_12months
-
-prcp_dict = {date: prcp for date, prcp in prcp_12months}
-
-
-station_counts = session.query(Measurement.station, func.count(Measurement.prcp)).\
-    group_by(Measurement.station).all()
-
-stations_dict = {station: prcp for station, prcp in station_counts}
-
-temp_12months = session.query(Measurement.date, Measurement.tobs).\
-    filter(Measurement.date < '2017-08-23', Measurement.date > '2016-08-22').\
-    filter(Measurement.station == 'USC00519281').\
-    order_by(Measurement.date).all()
-
-temp_12months_dict = {date: tobs for date, tobs in temp_12months}
-
 
 app = Flask(__name__)
 
@@ -83,22 +63,55 @@ def welcome():
         f"/api/v1.0/precipitation <br/>"
         f"/api/v1.0/stations <br/>"
         f"/api/v1.0/tobs <br/>"
-        f"/api/v1.0/<start> <br/>"
-        f"/api/v1.0/<start>/<end>"
+        f"/api/v1.0/<start_date> <br/>"
+        f"/api/v1.0/<start_date>/<end_date> <br/>"
     )
 
 @app.route("/api/v1.0/precipitation")
 def precipitation():
+
+    prcp_12months = session.query(Measurement.date, Measurement.prcp).\
+    filter(Measurement.date < '2017-08-23', Measurement.date > '2016-08-22').\
+    order_by(Measurement.date).all()
+
+    prcp_dict = {date: prcp for date, prcp in prcp_12months}
     return jsonify(prcp_dict)
 
 
 @app.route("/api/v1.0/stations")
 def stations():
+
+    station_counts = session.query(Measurement.station, func.count(Measurement.prcp)).\
+    group_by(Measurement.station).all()
+
+    stations_dict = {station: prcp for station, prcp in station_counts}
     return jsonify(stations_dict)
 
 @app.route("/api/v1.0/tobs")
 def tobs():
+
+    temp_12months = session.query(Measurement.date, Measurement.tobs).\
+    filter(Measurement.date < '2017-08-23', Measurement.date > '2016-08-22').\
+    filter(Measurement.station == 'USC00519281').\
+    order_by(Measurement.date).all()
+
+    temp_12months_dict = {date: tobs for date, tobs in temp_12months}
     return jsonify(temp_12months_dict)
+
+@app.route("/api/v1.0/<start_date>") #start date
+@app.route("/api/v1.0/<start_date>/<end_date>")# start and end date 
+def start_end_date(start_date = None, end_date = None):
+    if not end_date: #assuming there's no end_date
+        start_end_temp = session.query(func.min(Measurement.tobs), func.max(Measurement.tobs), func.avg(Measurement.tobs)).\
+            filter(Measurement.date >= start_date).all()
+    else:
+        start_end_temp = session.query(func.min(Measurement.tobs), func.max(Measurement.tobs), func.avg(Measurement.tobs)).\
+            filter( Measurement.date <= end_date, Measurement.date >= start_date).all()
+    
+    temp_results = list(np.ravel(start_end_temp))
+
+    return jsonify(temp_results)
+
 
 
 if __name__=="__main__":
